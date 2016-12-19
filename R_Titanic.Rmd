@@ -1,0 +1,589 @@
+---
+title: "R_Titanic"
+author: "Christine Iting Lin"
+date: "2016/12/19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+![](http://img.carnews.com/news_img/op189web/op189-a09-part1-J3.jpg)
+
+#目錄
+- 簡介
+- 資料讀取
+- 資料框外觀
+- 資料清理
+- 資料視覺化
+- 結論
+
+---
+
+# 簡介
+[鐵達尼號](https://zh.wikipedia.org/wiki/泰坦尼克号)（英語：RMS Titanic，中國大陸譯作泰坦尼克號）是一艘奧林匹克級郵輪，於1912年4月處女航時撞上冰山後沉沒。在鐵達尼號的處女航中，從英國南安普敦出發，途經法國瑟堡-奧克特維爾以及愛爾蘭昆士敦，計劃橫渡大西洋前往美國紐約市。但因為人為錯誤，於1912年4月14日船上時間夜裡11點40分撞上冰山；2小時40分鐘後，即4月15日凌晨02點20分，船裂成兩半後沉入大西洋，死亡人數超越1500人，堪稱20世紀最大的海難事件。
+
+在這份報告採用 Kaggle 的 Titanic 訓練資料，利用 [R語言](https://zh.wikipedia.org/wiki/R语言) 來進行資料整理與探索性分析，探討船難中存活率與不同變數之關聯。
+
+# 資料讀取
+我使用 read.csv(  ) 函數讀入資料集。
+```{r}
+titanic_csv <- read.csv("https://storage.googleapis.com/r_rookies/kaggle_titanic_train.csv")
+```
+
+# 資料框外觀
+此資料有 891 個觀測值與 12 個變數。
+```{r}
+str(titanic_csv)
+```
+
+## 
+我利用 mice 套件中的 md.pattern(  ) 函數發現有缺失的數據。
+
+输出结果顯示，有 714 個樣本是完整的，177個樣本缺失 Age 觀測值。
+```{r}
+library(mice)
+md.pattern(titanic_csv)
+```
+
+# 資料清理
+針對 Age 觀測值做進一步了解，此變數有 177 個遺漏質。
+```{r}
+summary(titanic_csv$Age)
+```
+
+##
+我決定將資料依據性別(男性/女性)，艙等(一等/二等/三等)，以及是否與父母/小孩同遊做分類。
+依據分類再利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+最後，將分類後填補好的完整資料重新組合在一起，變成一個完整的資料以便後續分析。
+
+##
+**◊ 將資料中的男性乘客挑出**
+```{r}
+titanic_male <- titanic_csv[titanic_csv$Sex == "male", ]
+```
+
+##
+**◊ 將男性乘客資料中的一等艙乘客挑出，發現此類乘客 Age 有 21 個遺漏質**
+```{r}
+titanic_male_1class <- titanic_male[titanic_male$Pclass == 1, ]
+summary(titanic_male_1class$Age)
+```
+
+##
+**◊ 將男性一等艙乘客資料中的"與"父母/小孩同遊乘客挑出，發現此類乘客 Age 並無遺漏質**
+```{r}
+titanic_male_1class_YesParch <- titanic_male_1class[titanic_male_1class$Parch > 0, ]
+summary(titanic_male_1class_YesParch$Age)
+```
+
+##
+**◊ 將男性一等艙乘客資料中的"並無"與父母/小孩同遊乘客挑出，發現此類乘客 Age 有 21 個遺漏質**
+```{r}
+titanic_male_1class_NoParch <- titanic_male_1class[titanic_male_1class$Parch == 0, ]
+summary(titanic_male_1class_NoParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+  m: 產生三個被填補好的資料表。
+  meth: 使用 Predictive Mean Matching (預測平均匹配法) 進行遺漏值預測。
+  seed: set.seed(  ) 來令抽樣每次都一樣。
+```{r}
+TempData_titanic_male_1class_NoParch <- mice(titanic_male_1class_NoParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_male_1class_NoParch)
+```
+
+##
+- 查看預測的數據。
+```{r}
+TempData_titanic_male_1class_NoParch$imp$Age
+```
+
+##
+- 將預測數據填入缺失職欄位。缺失的值被數據集的第一個數據集做了替換。
+  由於前面 mice(  ) 函數設定 m 為 1 ，因此只產生一個數集，如果增加 m。 的設定值，並希望使用另一個數據集，只需更改 complete(  ) 函數的第二個參數。
+```{r}
+CompletedData_titanic_male_1class_NoParch <- complete(TempData_titanic_male_1class_NoParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_male_1class_NoParch$Age)
+```
+
+##
+**◊ 將男性乘客資料中的二等艙乘客挑出，發現此類乘客 Age 有 9 個遺漏質**
+```{r}
+titanic_male_2class <- titanic_male[titanic_male$Pclass == 2, ]
+summary(titanic_male_2class$Age)
+```
+
+##
+**◊ 將男性二等艙乘客資料中的"與"父母/小孩同遊乘客挑出，發現此類乘客 Age 並無遺漏質**
+```{r}
+titanic_male_2class_YesParch <- titanic_male_2class[titanic_male_2class$Parch > 0, ]
+summary(titanic_male_2class_YesParch$Age)
+```
+
+##
+**◊ 將男性二等艙乘客資料中的"並無"與父母/小孩同遊乘客挑出，發現此類乘客 Age 有 9 個遺漏質**
+```{r}
+titanic_male_2class_NoParch <- titanic_male_2class[titanic_male_2class$Parch == 0, ]
+summary(titanic_male_2class_NoParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_male_2class_NoParch <- mice(titanic_male_2class_NoParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_male_2class_NoParch)
+TempData_titanic_male_2class_NoParch$imp$Age
+CompletedData_titanic_male_2class_NoParch <- complete(TempData_titanic_male_2class_NoParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_male_2class_NoParch$Age)
+```
+
+##
+**◊ 將男性乘客資料中的三等艙乘客挑出，發現此類乘客 Age 有 94 個遺漏質**
+```{r}
+titanic_male_3class <- titanic_male[titanic_male$Pclass == 3, ]
+summary(titanic_male_3class$Age)
+```
+
+**◊ 將男性三等艙乘客資料中的"與"父母/小孩同遊乘客挑出，發現此類乘客 Age 有 8 個遺漏質**
+```{r}
+titanic_male_3class_YesParch <- titanic_male_3class[titanic_male_3class$Parch > 0, ]
+summary(titanic_male_3class_YesParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_male_3class_YesParch <- mice(titanic_male_3class_YesParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_male_3class_YesParch)
+TempData_titanic_male_3class_YesParch$imp$Age
+CompletedData_titanic_male_3class_YesParch <- complete(TempData_titanic_male_3class_YesParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_male_3class_YesParch$Age)
+```
+
+##
+**◊ 將男性三等艙乘客資料中的"並無"與父母/小孩同遊乘客挑出，發現此類乘客 Age 有 86 個遺漏質**
+```{r}
+titanic_male_3class_NoParch <- titanic_male_3class[titanic_male_3class$Parch == 0, ]
+summary(titanic_male_3class_NoParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_male_3class_NoParch <- mice(titanic_male_3class_NoParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_male_3class_NoParch)
+TempData_titanic_male_3class_NoParch$imp$Age
+CompletedData_titanic_male_3class_NoParch <- complete(TempData_titanic_male_3class_NoParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_male_3class_NoParch$Age)
+```
+
+##
+**◊ 將資料中的女性乘客挑出**
+```{r}
+titanic_female <- titanic_csv[titanic_csv$Sex == "female", ]
+```
+
+##
+**◊ 將女性乘客資料中的一等艙乘客挑出，發現此類乘客 Age 有 9 個遺漏質**
+```{r}
+titanic_female_1class <- titanic_female[titanic_female$Pclass == 1, ]
+summary(titanic_female_1class$Age)
+```
+
+**◊ 將女性一等艙乘客資料中的"與"父母/小孩同遊乘客挑出，發現此類乘客 Age 有 1 個遺漏質**
+```{r}
+titanic_female_1class_YesParch <- titanic_female_1class[titanic_female_1class$Parch > 0, ]
+summary(titanic_female_1class_YesParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_female_1class_YesParch <- mice(titanic_female_1class_YesParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_female_1class_YesParch)
+TempData_titanic_female_1class_YesParch$imp$Age
+CompletedData_titanic_female_1class_YesParch <- complete(TempData_titanic_female_1class_YesParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_female_1class_YesParch$Age)
+```
+
+##
+**◊ 將女性一等艙乘客資料中的"並無"與父母/小孩同遊乘客挑出，發現此類乘客 Age 有 8 個遺漏質**
+```{r}
+titanic_female_1class_NoParch <- titanic_female_1class[titanic_female_1class$Parch == 0, ]
+summary(titanic_female_1class_NoParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_female_1class_NoParch <- mice(titanic_female_1class_NoParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_female_1class_NoParch)
+TempData_titanic_female_1class_NoParch$imp$Age
+CompletedData_titanic_female_1class_NoParch <- complete(TempData_titanic_female_1class_NoParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_female_1class_NoParch$Age)
+```
+
+##
+**◊ 將女性乘客資料中的二等艙乘客挑出，發現此類乘客 Age 有 2 個遺漏質**
+```{r}
+titanic_female_2class <- titanic_female[titanic_female$Pclass == 2, ]
+summary(titanic_female_2class$Age)
+```
+
+##
+**◊ 將女性二等艙乘客資料中的"與"父母/小孩同遊乘客挑出，發現此類乘客 Age 並無遺漏質**
+```{r}
+titanic_female_2class_YesParch <- titanic_female_2class[titanic_female_2class$Parch > 0, ]
+summary(titanic_female_2class_YesParch$Age)
+```
+
+##
+**◊ 將女性二等艙乘客資料中的"並無"與父母/小孩同遊乘客挑出，發現此類乘客 Age 有 2 個遺漏質**
+```{r}
+titanic_female_2class_NoParch <- titanic_female_2class[titanic_female_2class$Parch == 0, ]
+summary(titanic_female_2class_NoParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_female_2class_NoParch <- mice(titanic_female_2class_NoParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_female_2class_NoParch)
+TempData_titanic_female_2class_NoParch$imp$Age
+CompletedData_titanic_female_2class_NoParch <- complete(TempData_titanic_female_2class_NoParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_female_2class_NoParch$Age)
+```
+
+##
+**◊ 將女性乘客資料中的三等艙乘客挑出，發現此類乘客 Age 有 42 個遺漏質**
+```{r}
+titanic_female_3class <- titanic_female[titanic_female$Pclass == 3, ]
+summary(titanic_female_3class$Age)
+```
+
+**◊ 將女性三等艙乘客資料中的"與"父母/小孩同遊乘客挑出，發現此類乘客 Age 有 11 個遺漏質**
+```{r}
+titanic_female_3class_YesParch <- titanic_female_3class[titanic_female_3class$Parch > 0, ]
+summary(titanic_female_3class_YesParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_female_3class_YesParch <- mice(titanic_female_3class_YesParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_female_3class_YesParch)
+TempData_titanic_female_3class_YesParch$imp$Age
+CompletedData_titanic_female_3class_YesParch <- complete(TempData_titanic_female_3class_YesParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_female_3class_YesParch$Age)
+```
+
+##
+**◊ 將女性三等艙乘客資料中的"並無"與父母/小孩同遊乘客挑出，發現此類乘客 Age 有 31 個遺漏質**
+```{r}
+titanic_female_3class_NoParch <- titanic_female_3class[titanic_female_3class$Parch == 0, ]
+summary(titanic_female_3class_NoParch$Age)
+```
+
+##
+- 利用 mice 套件中的 mice(  ) 函數對遺漏質做預測及填補。
+```{r}
+TempData_titanic_female_3class_NoParch <- mice(titanic_female_3class_NoParch, m = 1, meth = 'pmm', seed = 500)
+summary(TempData_titanic_female_3class_NoParch)
+TempData_titanic_female_3class_NoParch$imp$Age
+CompletedData_titanic_female_3class_NoParch <- complete(TempData_titanic_female_3class_NoParch, 1)
+```
+
+##
+- 此類乘客 Age 沒有遺漏值了。
+```{r}
+summary(CompletedData_titanic_female_3class_NoParch$Age)
+```
+
+##
+**◊ 將各分類，填補好的完整資料，重新組合在一起**
+**  資料有 891 個觀測值與 12 個變數，且 Age 沒有遺漏值存在**
+```{r}
+CompletedData_titanic_male_1class <- merge(titanic_male_1class_YesParch, CompletedData_titanic_male_1class_NoParch, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_male_2class <- merge(titanic_male_2class_YesParch, CompletedData_titanic_male_2class_NoParch, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_male_3class <- merge(CompletedData_titanic_male_3class_YesParch, CompletedData_titanic_male_3class_NoParch, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_male_1n2class <- merge(CompletedData_titanic_male_1class, CompletedData_titanic_male_2class, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_male <- merge(CompletedData_titanic_male_1n2class, CompletedData_titanic_male_3class, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_female_1class <- merge(CompletedData_titanic_female_1class_YesParch, CompletedData_titanic_female_1class_NoParch, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_female_2class <- merge(titanic_female_2class_YesParch, CompletedData_titanic_female_2class_NoParch, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_female_3class <- merge(CompletedData_titanic_female_3class_YesParch, CompletedData_titanic_female_3class_NoParch, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_female_1n2class <- merge(CompletedData_titanic_female_1class, CompletedData_titanic_female_2class, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_female <- merge(CompletedData_titanic_female_1n2class, CompletedData_titanic_female_3class, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_df <- merge(CompletedData_titanic_male, CompletedData_titanic_female, all.x = TRUE, all.y = TRUE)
+str(CompletedData_titanic_df)
+summary(CompletedData_titanic_df$Age)
+```
+
+##
+**◊ 新增一個 Age_Range 變數，將各年齡乘客分入 5 個年齡層，方便後續分析**
+**  Infant (0-2)，Child (3-12)，Adolescent (13-18)，Ａdult (19-64)，Elderly (64up)**
+**  資料有 891 個觀測值與 13 個變數，且 Age 沒有遺漏值存在**
+```{r}
+titanic_Infant <- CompletedData_titanic_df[CompletedData_titanic_df$Age <= 2, ]
+Age_Range <- c(rep("Infant (0-2)", times = nrow(titanic_Infant)))
+titanic_Infant_df <- cbind(titanic_Infant, Age_Range)
+```
+
+```{r}
+titanic_Child <- CompletedData_titanic_df[(CompletedData_titanic_df$Age > 2) & (CompletedData_titanic_df$Age <= 12), ]
+Age_Range <- c(rep("Child (3-12)", times = nrow(titanic_Child)))
+titanic_Child_df <- cbind(titanic_Child, Age_Range)
+```
+
+```{r}
+titanic_Adolescent <- CompletedData_titanic_df[(CompletedData_titanic_df$Age > 12) & (CompletedData_titanic_df$Age <= 18), ]
+Age_Range <- c(rep("Adolescent (13-18)", times = nrow(titanic_Adolescent)))
+titanic_Adolescent_df <- cbind(titanic_Adolescent, Age_Range)
+```
+
+```{r}
+titanic_Adult <- CompletedData_titanic_df[(CompletedData_titanic_df$Age > 18) & (CompletedData_titanic_df$Age <= 64), ]
+Age_Range <- c(rep("Adult (19-64)", times = nrow(titanic_Adult)))
+titanic_Adult_df <- cbind(titanic_Adult, Age_Range)
+```
+
+```{r}
+titanic_Elderly <- CompletedData_titanic_df[CompletedData_titanic_df$Age > 64, ]
+Age_Range <- c(rep("Elderly (65up)", times = nrow(titanic_Elderly)))
+titanic_Elderly_df <- cbind(titanic_Elderly, Age_Range)
+```
+
+```{r}
+CompletedData_titanic_0n3 <- merge(titanic_Infant_df, titanic_Child_df, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_0n3n13 <- merge(CompletedData_titanic_0n3, titanic_Adolescent_df, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_0n3n13n19 <- merge(CompletedData_titanic_0n3n13, titanic_Adult_df, all.x = TRUE, all.y = TRUE)
+CompletedData_titanic_0n3n13n19n66 <- merge(CompletedData_titanic_0n3n13n19, titanic_Elderly_df, all.x = TRUE, all.y = TRUE)
+
+CompletedData_titanic_csv <- CompletedData_titanic_0n3n13n19n66[, c("PassengerId", "Survived", "Pclass", "Name", "Sex", "Age", "Age_Range", "SibSp", "Parch", "Ticket", "Fare", "Cabin", "Embarked")]
+
+str(CompletedData_titanic_csv)
+summary(CompletedData_titanic_csv$Age)
+```
+
+# 資料視覺化
+**將資料做分類，方便後續分析**
+```{r}
+CompletedData_titanic_Survivor <- CompletedData_titanic_csv[CompletedData_titanic_csv$Survived == TRUE, ]
+CompletedData_titanic_Male <- CompletedData_titanic_csv[CompletedData_titanic_csv$Sex == "male", ]
+CompletedData_titanic_Female <- CompletedData_titanic_csv[CompletedData_titanic_csv$Sex == "female", ]
+CompletedData_titanic_1Class <- CompletedData_titanic_csv[CompletedData_titanic_csv$Pclass == 1, ]
+CompletedData_titanic_2Class <- CompletedData_titanic_csv[CompletedData_titanic_csv$Pclass == 2, ]
+CompletedData_titanic_3Class <- CompletedData_titanic_csv[CompletedData_titanic_csv$Pclass == 3, ]
+```
+
+##
+**我利用 ggplot2 與 plotly 套件來作圖**
+```{r}
+library(ggplot2)
+library(plotly)
+```
+
+##
+**◊ 性別 v.s. 存活率**
+
+- 女性存活率 > 男性存活率
+```{r}
+bar_sex <- ggplot(CompletedData_titanic_csv, aes(x = factor(Sex), fill = factor(Survived))) + geom_bar()
+bar_sex_plotly <- ggplotly(bar_sex)
+bar_sex_plotly
+```
+
+##
+**◊ 艙等 v.s. 存活率**
+
+- 一等存活率 > 二等存活率 > 三等存活率
+```{r}
+bar_pclass <- ggplot(CompletedData_titanic_csv, aes(x = factor(Pclass), fill = factor(Survived))) + geom_bar()
+bar_pclass_plotly <- ggplotly(bar_pclass)
+bar_pclass_plotly
+```
+
+##
+**◊ 年齡 v.s. 存活率**
+
+- 看不太出關聯性
+```{r}
+bar_age <- ggplot(CompletedData_titanic_csv, aes(x = factor(Age), fill = factor(Survived))) + geom_bar()
+bar_age_plotly <- ggplotly(bar_age)
+bar_age_plotly
+```
+
+##
+**◊ 年齡層 v.s. 存活率**
+
+- 不同年齡層，存活率大致相同
+```{r}
+bar_age_range <- ggplot(CompletedData_titanic_csv, aes(x = factor(Age_Range), fill = factor(Survived))) + geom_bar()
+bar_age_range_plotly <- ggplotly(bar_age_range)
+bar_age_range_plotly
+```
+
+##
+**◊ 男性中， 艙等 v.s. 存活率**
+
+- 男性中，一等存活率 > 二等存活率 > 三等存活率
+```{r}
+bar_male<- ggplot(CompletedData_titanic_Male, aes(x = factor(Pclass), fill = factor(Survived))) + geom_bar()
+bar_male_plotly <- ggplotly(bar_male)
+bar_male_plotly
+```
+
+##
+**◊ 女性中， 艙等 v.s. 存活率**
+
+- 女性中，一等存活率>二等存活率>三等存活率
+```{r}
+bar_female <- ggplot(CompletedData_titanic_Female, aes(x = factor(Pclass), fill = factor(Survived))) + geom_bar()
+bar_female_plotly <- ggplotly(bar_female)
+bar_female_plotly
+```
+
+##
+**◊ 男性中， 年齡層 v.s. 存活率**
+
+- 男性中，青年與成年人存活率極低，年長者僅較好些許，嬰兒與孩童存活率50%
+```{r}
+bar_male_AgeRange <- ggplot(CompletedData_titanic_Male, aes(x = factor(Age_Range), fill = factor(Survived))) + geom_bar()
+bar_male_AgeRange_plotly <- ggplotly(bar_male_AgeRange)
+bar_male_AgeRange_plotly
+```
+
+##
+**◊ 女性中， 年齡層 v.s. 存活率**
+
+- 女性中，各年齡層存活率皆比男性高出許多，且船上沒有年長者女性
+```{r}
+bar_female_AgeRange <- ggplot(CompletedData_titanic_Female, aes(x = factor(Age_Range), fill = factor(Survived))) + geom_bar()
+bar_female_AgeRange_plotly <- ggplotly(bar_female_AgeRange)
+bar_female_AgeRange_plotly
+```
+
+##
+**◊ 一等艙中， 性別 v.s. 存活率**
+
+- 一等艙中，女性存活率 > 男性存活率
+```{r}
+bar_1class <- ggplot(CompletedData_titanic_1Class, aes(x = factor(Sex), fill = factor(Survived))) + geom_bar()
+bar_1class_plotly <- ggplotly(bar_1class)
+bar_1class_plotly
+```
+
+##
+**◊ 二等艙中， 性別 v.s. 存活率**
+
+- 二等艙中，女性存活率 > 男性存活率
+```{r}
+bar_2class <- ggplot(CompletedData_titanic_2Class, aes(x = factor(Sex), fill = factor(Survived))) + geom_bar()
+bar_2class_plotly <- ggplotly(bar_2class)
+bar_2class_plotly
+```
+
+##
+**◊ 三等艙中， 性別 v.s. 存活率**
+
+- 三等艙中，女性存活率 > 男性存活率
+```{r}
+bar_3class <- ggplot(CompletedData_titanic_3Class, aes(x = factor(Sex), fill = factor(Survived))) + geom_bar()
+bar_3class_plotly <- ggplotly(bar_3class)
+bar_3class_plotly
+```
+
+##
+**◊ 一等艙中， 年齡層 v.s. 存活率**
+
+- 一等艙中，年齡層存活率大致與二、三等車廂相同
+```{r}
+bar_1class_AgeRange <- ggplot(CompletedData_titanic_1Class, aes(x = factor(Age_Range), fill = factor(Survived))) + geom_bar()
+bar_1class_AgeRange_plotly <- ggplotly(bar_1class_AgeRange)
+bar_1class_AgeRange_plotly
+```
+
+##
+**◊ 二等艙中， 年齡層 v.s. 存活率**
+
+- 二等艙中，年齡層存活率大致與一、三等車廂相同
+```{r}
+bar_2class_AgeRange <- ggplot(CompletedData_titanic_2Class, aes(x = factor(Age_Range), fill = factor(Survived))) + geom_bar()
+bar_2class_AgeRange_plotly <- ggplotly(bar_2class_AgeRange)
+bar_2class_AgeRange_plotly
+```
+
+##
+**◊ 三等艙中， 年齡層 v.s. 存活率**
+
+- 三等艙中，年齡層存活率大致與一、二等車廂相同
+```{r}
+bar_3class_AgeRange <- ggplot(CompletedData_titanic_3Class, aes(x = factor(Age_Range), fill = factor(Survived))) + geom_bar()
+bar_3class_AgeRange_plotly <- ggplotly(bar_3class_AgeRange)
+bar_3class_AgeRange_plotly
+```
+
+# 結論
+
+![](http://images.closerweekly.com/uploads/photos/file/117727/titanic-photo-9-words.jpg?crop=top&fit=clip&h=500&w=698)
+
+> "*Promise me you will survive....that you will never give up...no matter what happens...no matter how hopeless...promise me.*"
+> － *Jack Dawson*
+
+鐵達尼號船難中，性別與艙等對於存活與否較相關。
+
+不同年齡層對存活率影響不大，不過嬰兒與孩童不論性別存活率大約為一半，可以推論在船難中，會優先保護小孩子。
+
+然而，男性與女性存活率差別在於青年與成年人兩個年齡層。在此兩個年齡層中，男性存活率不到兩成，女性存活率大約七成。
+
+船難中，女性的存活率遠高於男性。性別為最主要存活關鍵。
+
+鐵達尼號上二等艙的乘客較少，不過大致上一等艙乘客存活率高於二等艙乘客存活率高於三等艙乘客。
+
+一等艙與二等艙的女性幾乎是全數存活，三等艙的女性存活率也高達一半。
+
+相較於男性，於三艙等存活率皆不到一半。一等艙男性存活率接近四成，二三等艙男性存活率不到兩成。
+
+可以推論在船難中，會優先保護女性，再來是孩童，然後一等艙可能有較好的逃生設備或鄰近最佳的逃生路線。
