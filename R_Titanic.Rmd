@@ -590,3 +590,5 @@ bar_3class_AgeRange_plotly
 相較於男性，於三艙等存活率皆不到一半。一等艙男性存活率接近四成，二三等艙男性存活率不到兩成。
 
 可以推論在船難中，會優先保護女性，再來是孩童，然後一等艙可能有較好的逃生設備或鄰近最佳的逃生路線。
+
+Please click here for the [HTML Result](file:///Users/christinelin/R_Titanic/R_Titanic.html)
