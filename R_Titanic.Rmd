@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ![](http://img.carnews.com/news_img/op189web/op189-a09-part1-J3.jpg)
 
+[HTML Result](file:///Users/christinelin/R_Titanic/R_Titanic.html)
+
 #目錄
 - 簡介
 - 資料讀取
