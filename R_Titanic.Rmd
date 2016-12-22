@@ -345,7 +345,7 @@ summary(CompletedData_titanic_female_3class_NoParch$Age)
 ##
 **◊ 將各分類，填補好的完整資料，重新組合在一起**
 
-**  資料有 891 個觀測值與 12 個變數，且 Age 沒有遺漏值存在**
+**資料有 891 個觀測值與 12 個變數，且 Age 沒有遺漏值存在**
 ```{r}
 CompletedData_titanic_male_1class <- merge(titanic_male_1class_YesParch, CompletedData_titanic_male_1class_NoParch, all.x = TRUE, all.y = TRUE)
 CompletedData_titanic_male_2class <- merge(titanic_male_2class_YesParch, CompletedData_titanic_male_2class_NoParch, all.x = TRUE, all.y = TRUE)
@@ -365,9 +365,9 @@ summary(CompletedData_titanic_df$Age)
 ##
 **◊ 新增一個 Age_Range 變數，將各年齡乘客分入 5 個年齡層，方便後續分析**
 
-**  Infant (0-2)，Child (3-12)，Adolescent (13-18)，Ａdult (19-64)，Elderly (64up)**
+**Infant (0-2)，Child (3-12)，Adolescent (13-18)，Ａdult (19-64)，Elderly (64up)**
 
-**  資料有 891 個觀測值與 13 個變數，且 Age 沒有遺漏值存在**
+**資料有 891 個觀測值與 13 個變數，且 Age 沒有遺漏值存在**
 ```{r}
 titanic_Infant <- CompletedData_titanic_df[CompletedData_titanic_df$Age <= 2, ]
 Age_Range <- c(rep("Infant (0-2)", times = nrow(titanic_Infant)))
